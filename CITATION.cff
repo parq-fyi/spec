@@ -1,0 +1,42 @@
+cff-version: 1.2.0
+message: "If you use or build on parqs, please cite the spec as below."
+type: software
+title: "Parqs: Parquet as OCI images"
+version: "v1"
+abstract: "Open data you can query, verify, and mirror on any OCI registry. A specification for publishing open data as Parquet files in an OCI image, with the publisher's original files saved in a source image of their own."
+authors:
+  - given-names: Oli
+    family-names: Evans
+    orcid: "https://orcid.org/0009-0005-6983-1640"
+repository-code: "https://github.com/parq-fyi/spec"
+license: CC-BY-4.0
+keywords:
+  - open data
+  - Parquet
+  - OCI
+  - provenance
+  - reproducibility
+references:
+  - type: standard
+    title: "OCI Image Format Specification"
+    authors:
+      - name: "Open Container Initiative"
+    version: "1.1"
+    url: "https://github.com/opencontainers/image-spec"
+  - type: standard
+    title: "Apache Parquet"
+    authors:
+      - name: "The Apache Software Foundation"
+    url: "https://parquet.apache.org/"
+  - type: standard
+    title: "Data Package"
+    authors:
+      - name: "Frictionless Data"
+    version: "2.0"
+    url: "https://datapackage.org/"
+  - type: data
+    title: "Patients Registered at a GP Practice, September 2026"
+    authors:
+      - name: "NHS England"
+    url: "https://digital.nhs.uk/data-and-information/publications/statistical/patients-registered-at-a-gp-practice/september-2026"
+    license: OGL-UK-3.0
