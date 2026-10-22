@@ -204,14 +204,16 @@ Some rules only matter for one of the [claims](#what-a-parq-can-tell-you), and s
     "org.opencontainers.image.base.digest": "sha256:3e640dfadc3dee2fdc7886b6afa48730b8fd6711475ec33f55e8063f20a60d20",
     "org.opencontainers.image.base.name": "ghcr.io/parq-fyi/gp-regions-source:2026-09-10",
     "org.opencontainers.image.created": "2026-09-10T00:00:00Z",
-    "org.opencontainers.image.licenses": "OGL-UK-3.0"
+    "org.opencontainers.image.licenses": "OGL-UK-3.0",
+    "org.opencontainers.image.revision": "5c6a0cd7443f46f40c436f70ec2d6aaed80f3f57",
+    "org.opencontainers.image.source": "https://github.com/parq-fyi/spec"
   }
 }
 ```
 
 `ghcr.io/parq-fyi/gp-regions:2026-09-10`, digest
-`sha256:cc6a73d27611c52bb9c59bedb819f13e2eac329299aee71cb65a43966a5d2c66`. It's traceable, and not yet
-reproducible: published from a repository, it would add `source` and `revision`.
+`sha256:36174d501392e9756fe03489d5f8c99f1eaa2c703b952f356bb12d5220a43780`, published by this repository's
+[workflow](.github/workflows/example.yml) from commit `5c6a0cd`.
 
 ### The tables
 
@@ -267,10 +269,10 @@ sha256:a707832a2d308f97541e8a2a0654c9322dd9014e8454047897015904eac62f95
 - The repository **SHOULD** say where its images are published, so people and agents can find them from
   it.
 
-`example.sh` made `regions.parquet` as
-`sha256:d393bdd0dd45880fe5d9f64171df01d598e167912b2d9ee596bc45c4d4b6ec5c` each time it ran: twice on
-macOS, from empty folders under two registry names, and once through its `Dockerfile` on Linux. The
-dataset manifests differed only in `base.name`.
+`example.sh` has made `regions.parquet` as
+`sha256:d393bdd0dd45880fe5d9f64171df01d598e167912b2d9ee596bc45c4d4b6ec5c` every time it's run: directly on
+macOS and on GitHub's Linux runner, and through its `Dockerfile` on both. Its manifests differed only where
+they name a registry or a commit.
 
 ### Attesting
 
@@ -280,17 +282,19 @@ dataset manifests differed only in `base.name`.
   **SHOULD** include every table, so a table can be checked on its own. Where the dataset names `source`
   and `revision`, the statement **SHOULD** name the same repository and commit.
 
-`example.sh` doesn't sign. ods-data does, from GitHub Actions:
+The workflow signs the image and its table together, then attaches the bundle:
 
 ```console
-$ gh attestation verify oci://ghcr.io/olizilla/ods-data:2026-09-25_0.2.0 --owner olizilla --format json \
-    | jq -r '.[].verificationResult.signature.certificate.subjectAlternativeName' | sort | uniq -c
-   3 https://github.com/olizilla/ods/.github/workflows/build-dataset.yml@refs/heads/main
-   1 https://github.com/olizilla/ods/.github/workflows/build-dataset.yml@refs/tags/v0.2.2
+$ gh attestation verify oci://ghcr.io/parq-fyi/gp-regions:2026-09-10 --bundle-from-oci --owner parq-fyi --format json \
+    | jq -r '.[].verificationResult | (.statement.subject[] | .digest.sha256 + "  " + .name), .signature.certificate.sourceRepositoryDigest'
+36174d501392e9756fe03489d5f8c99f1eaa2c703b952f356bb12d5220a43780  ghcr.io/parq-fyi/gp-regions
+d393bdd0dd45880fe5d9f64171df01d598e167912b2d9ee596bc45c4d4b6ec5c  regions.parquet
+5c6a0cd7443f46f40c436f70ec2d6aaed80f3f57
+$ gh attestation verify regions.parquet --owner parq-fyi --format json --jq '.[].verificationResult.signature.certificate.subjectAlternativeName'
+https://github.com/parq-fyi/spec/.github/workflows/example.yml@refs/heads/main
 ```
 
-Four signed records for one digest: the release's, and three from rehearsals that built the same image.
-These name the image only; from ods-data 0.3.0 they name each table too.
+The signed commit is the dataset's `revision`, and the table checks out on its own.
 
 ## Naming
 
