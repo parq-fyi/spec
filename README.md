@@ -10,7 +10,7 @@ and much easier to publish insights from open data in a way that anyone can chec
 ## Patterns not platforms
 
 There are two ideas here. Adopting either is a win.
-- Publish open data in any format as an OCI image. Normalising the shape of the distribution channel so generic tools can fetch and verify any release.
+- Publish open data in any format as an OCI image, like [homebrew](https://brew.sh/) does for software. Normalising the shape of the distribution channel so generic tools can fetch and verify any release.
 - Publish open data as Parquet. It's a better CSV with typed columns you don't have to guess from the values, designed to be easy to query. Open data should aim to be queried more often than it is published. For many datasets this is not yet true.
 
 A parq is a set of parquet files published as an OCI image: one Parquet file per table, each a layer, named by its
