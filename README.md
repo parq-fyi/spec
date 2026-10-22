@@ -207,15 +207,15 @@ at `ghcr.io/parq-fyi`.
     "org.opencontainers.image.base.name": "ghcr.io/parq-fyi/gp-regions-source:2026-09-10",
     "org.opencontainers.image.created": "2026-09-10T00:00:00Z",
     "org.opencontainers.image.licenses": "OGL-UK-3.0",
-    "org.opencontainers.image.revision": "5c6a0cd7443f46f40c436f70ec2d6aaed80f3f57",
+    "org.opencontainers.image.revision": "54c7a7d8e17a0f7db8999b11caa3dc56137c754b",
     "org.opencontainers.image.source": "https://github.com/parq-fyi/spec"
   }
 }
 ```
 
 `ghcr.io/parq-fyi/gp-regions:2026-09-10`, digest
-`sha256:36174d501392e9756fe03489d5f8c99f1eaa2c703b952f356bb12d5220a43780`, published by this repository's
-[workflow](.github/workflows/example.yml) from commit `5c6a0cd`.
+`sha256:e4661fed27c6ebfa849acd1375947b370d8b3be04fc56554e51b46492f24b6dd`, published by this repository's
+[workflow](.github/workflows/example.yml) from commit `54c7a7d`.
 
 ### The parquet files
 
@@ -301,14 +301,16 @@ The workflow signs the image and its table together, then attaches the bundle:
 ```console
 $ gh attestation verify oci://ghcr.io/parq-fyi/gp-regions:2026-09-10 --bundle-from-oci --owner parq-fyi --format json \
     | jq -r '.[].verificationResult | (.statement.subject[] | .digest.sha256 + "  " + .name), .signature.certificate.sourceRepositoryDigest'
-36174d501392e9756fe03489d5f8c99f1eaa2c703b952f356bb12d5220a43780  ghcr.io/parq-fyi/gp-regions
+e4661fed27c6ebfa849acd1375947b370d8b3be04fc56554e51b46492f24b6dd  ghcr.io/parq-fyi/gp-regions
 d393bdd0dd45880fe5d9f64171df01d598e167912b2d9ee596bc45c4d4b6ec5c  regions.parquet
-5c6a0cd7443f46f40c436f70ec2d6aaed80f3f57
+54c7a7d8e17a0f7db8999b11caa3dc56137c754b
 $ gh attestation verify regions.parquet --owner parq-fyi --format json --jq '.[].verificationResult.signature.certificate.subjectAlternativeName'
+https://github.com/parq-fyi/spec/.github/workflows/example.yml@refs/heads/main
 https://github.com/parq-fyi/spec/.github/workflows/example.yml@refs/heads/main
 ```
 
-The signed commit is the parquet image's `revision`, and the table checks out on its own.
+The signed commit is the parquet image's `revision`. The table checks out on its own, with a record from
+each run that made it.
 
 ## Naming
 
