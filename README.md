@@ -344,6 +344,10 @@ The spec doesn't require names. As a guide:
 The spec's text is licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). `example.sh`,
 the `Dockerfile` and the workflow that runs them are licensed under [MIT](LICENSE).
 
+
+`░▒▓█ parquets & recommendations`
+
+
 [rfc2119]: https://www.rfc-editor.org/rfc/rfc2119
 [rfc8174]: https://www.rfc-editor.org/rfc/rfc8174
 [oci-manifest]: https://github.com/opencontainers/image-spec/blob/main/manifest.md
