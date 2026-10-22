@@ -1,0 +1,102 @@
+name: Example
+
+# Publishes the spec's example to ghcr.io/parq-fyi with example.sh, then signs it, so every example
+# in README.md can be fetched and checked. Run by hand: each run names its commit, so it moves the
+# dataset's tag to a new manifest. The source image and the table stay the same.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write # push to ghcr.io/parq-fyi
+  id-token: write # sign with Sigstore
+  attestations: write # record the attestation with GitHub
+
+jobs:
+  example:
+    runs-on: ubuntu-24.04
+    env:
+      DATASET: ghcr.io/parq-fyi/gp-regions:2026-09-10
+    services:
+      scratch-registry: # where the Dockerfile's run pushes, to compare its tables with the published ones
+        image: registry:2
+        ports:
+          - 5000:5000
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - uses: oras-project/setup-oras@1d808f7d7f6995cc68b7bf507bfe5c5446e1dc9d # v2.0.1
+
+      - name: Install DuckDB
+        run: |
+          curl -sSL https://github.com/duckdb/duckdb/releases/download/v1.4.1/duckdb_cli-linux-amd64.zip -o duckdb.zip
+          sudo unzip -d /usr/local/bin duckdb.zip duckdb
+          rm duckdb.zip
+          duckdb --version
+
+      - name: Log in to ghcr.io
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: oras login ghcr.io --username "${{ github.actor }}" --password-stdin <<<"$GITHUB_TOKEN"
+
+      - name: Make the example
+        env:
+          REG: ghcr.io/parq-fyi
+          REPO_URL: ${{ github.server_url }}/${{ github.repository }}
+          REVISION: ${{ github.sha }}
+        run: |
+          mkdir work
+          cd work
+          sh ../example.sh
+
+      - name: Make it again through the Dockerfile, and compare the tables
+        run: |
+          # The same script with its tools pinned, pushed to the scratch registry. Its tables must match
+          # the ones just published, digest for digest.
+          docker build -t parq-example .
+          docker run --rm --network host -e REG=localhost:5000/check parq-example
+          oras manifest fetch "$DATASET" | jq -r '.layers[].digest' >published.txt
+          oras manifest fetch localhost:5000/check/gp-regions:2026-09-10 | jq -r '.layers[].digest' >rebuilt.txt
+          diff published.txt rebuilt.txt
+          echo "✓ the same tables, run directly and through the Dockerfile"
+
+      - name: List what to sign
+        id: subjects
+        run: |
+          # The dataset image and each table, one "<hex digest>  <name>" line each, as sha256sum writes them.
+          digest="$(oras resolve "$DATASET")"
+          echo "digest=$digest" >>"$GITHUB_OUTPUT"
+          echo "${digest#sha256:}  ghcr.io/parq-fyi/gp-regions" >subjects.txt
+          oras manifest fetch "ghcr.io/parq-fyi/gp-regions@$digest" \
+            | jq -r '.layers[] | "\(.digest | ltrimstr("sha256:"))  \(.annotations["org.opencontainers.image.title"])"' \
+            >>subjects.txt
+          cat subjects.txt
+
+      - name: Sign
+        id: attest
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4
+        with:
+          subject-checksums: subjects.txt
+
+      - name: Attach the signature to the dataset image
+        env:
+          DIGEST: ${{ steps.subjects.outputs.digest }}
+          BUNDLE: ${{ steps.attest.outputs.bundle-path }}
+        run: |
+          # actions/attest only pushes to a registry for a single subject, so attach the bundle
+          # in the shape it would have pushed.
+          cp "$BUNDLE" bundle.json
+          oras attach "ghcr.io/parq-fyi/gp-regions@$DIGEST" \
+            --artifact-type application/vnd.dev.sigstore.bundle.v0.3+json \
+            --annotation dev.sigstore.bundle.content=dsse-envelope \
+            --annotation dev.sigstore.bundle.predicateType=https://slsa.dev/provenance/v1 \
+            bundle.json:application/vnd.dev.sigstore.bundle.v0.3+json
+
+      - name: Check the signature, from the registry and for the table alone
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DIGEST: ${{ steps.subjects.outputs.digest }}
+        run: |
+          gh attestation verify "oci://ghcr.io/parq-fyi/gp-regions@$DIGEST" --bundle-from-oci --owner parq-fyi
+          gh attestation verify work/regions.parquet --owner parq-fyi
