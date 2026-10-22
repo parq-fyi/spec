@@ -2,7 +2,7 @@ name: Example
 
 # Publishes the spec's example to ghcr.io/parq-fyi with example.sh, then signs it, so every example
 # in README.md can be fetched and checked. Run by hand: each run names its commit, so it moves the
-# dataset's tag to a new manifest. The source image and the table stay the same.
+# parquet image's tag to a new manifest. The source image and the table stay the same.
 
 on:
   workflow_dispatch:
@@ -17,7 +17,7 @@ jobs:
   example:
     runs-on: ubuntu-24.04
     env:
-      DATASET: ghcr.io/parq-fyi/gp-regions:2026-09-10
+      PARQUET_IMAGE: ghcr.io/parq-fyi/gp-regions:2026-09-10
     services:
       scratch-registry: # where the Dockerfile's run pushes, to compare its tables with the published ones
         image: registry:2
@@ -56,7 +56,7 @@ jobs:
           # the ones just published, digest for digest.
           docker build -t parq-example .
           docker run --rm --network host -e REG=localhost:5000/check parq-example
-          oras manifest fetch "$DATASET" | jq -r '.layers[].digest' >published.txt
+          oras manifest fetch "$PARQUET_IMAGE" | jq -r '.layers[].digest' >published.txt
           oras manifest fetch localhost:5000/check/gp-regions:2026-09-10 | jq -r '.layers[].digest' >rebuilt.txt
           diff published.txt rebuilt.txt
           echo "✓ the same tables, run directly and through the Dockerfile"
@@ -64,8 +64,8 @@ jobs:
       - name: List what to sign
         id: subjects
         run: |
-          # The dataset image and each table, one "<hex digest>  <name>" line each, as sha256sum writes them.
-          digest="$(oras resolve "$DATASET")"
+          # The parquet image and each table, one "<hex digest>  <name>" line each, as sha256sum writes them.
+          digest="$(oras resolve "$PARQUET_IMAGE")"
           echo "digest=$digest" >>"$GITHUB_OUTPUT"
           echo "${digest#sha256:}  ghcr.io/parq-fyi/gp-regions" >subjects.txt
           oras manifest fetch "ghcr.io/parq-fyi/gp-regions@$digest" \
@@ -79,7 +79,7 @@ jobs:
         with:
           subject-checksums: subjects.txt
 
-      - name: Attach the signature to the dataset image
+      - name: Attach the signature to the parquet image
         env:
           DIGEST: ${{ steps.subjects.outputs.digest }}
           BUNDLE: ${{ steps.attest.outputs.bundle-path }}

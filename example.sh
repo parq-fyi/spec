@@ -9,24 +9,29 @@ URL=https://files.digital.nhs.uk/86/375B51/$ZIP
 PAGE=https://digital.nhs.uk/data-and-information/publications/statistical/patients-registered-at-a-gp-practice/september-2026
 LICENSES='[{"name":"OGL-UK-3.0","path":"https://spdx.org/licenses/OGL-UK-3.0.html"}]'
 
-# 1. the source: the publisher's file, unchanged, described with OCI's standard annotations
-curl -sfLO "$URL"
+# 1. the source: the publisher's file, unchanged, described with OCI's standard annotations. Skipped when
+#    the registry already holds it, saved here or copied in, so a rebuild needs only the registry.
 printf '{}' > empty.json   # the empty config
-jq -n --arg page "$PAGE" '{"$manifest": {
-  "org.opencontainers.image.title": "Patients Registered at a GP Practice, September 2026",
-  "org.opencontainers.image.version": "2026-09-10",
-  "org.opencontainers.image.created": "2026-09-10T00:00:00Z",
-  "org.opencontainers.image.vendor": "NHS England",
-  "org.opencontainers.image.url": $page,
-  "org.opencontainers.image.licenses": "OGL-UK-3.0"}}' > source.annotations.json
-oras push "$REG/gp-regions-source:2026-09-10" --artifact-type application/vnd.fyi.parq.source.v1 \
-  --config empty.json:application/vnd.oci.empty.v1+json --annotation-file source.annotations.json "$ZIP:application/zip"
+if ! oras manifest fetch "$REG/gp-regions-source:2026-09-10" > /dev/null 2>&1; then
+  curl -sfLO "$URL"
+  jq -n --arg page "$PAGE" '{"$manifest": {
+    "org.opencontainers.image.title": "Patients Registered at a GP Practice, September 2026",
+    "org.opencontainers.image.version": "2026-09-10",
+    "org.opencontainers.image.created": "2026-09-10T00:00:00Z",
+    "org.opencontainers.image.vendor": "NHS England",
+    "org.opencontainers.image.url": $page,
+    "org.opencontainers.image.licenses": "OGL-UK-3.0"}}' > source.annotations.json
+  oras push "$REG/gp-regions-source:2026-09-10" --artifact-type application/vnd.fyi.parq.source.v1 \
+    --config empty.json:application/vnd.oci.empty.v1+json --annotation-file source.annotations.json "$ZIP:application/zip"
+fi
 SOURCE=$(oras resolve "$REG/gp-regions-source:2026-09-10")
-FILE=$(oras manifest fetch "$REG/gp-regions-source:2026-09-10" | jq -c '.layers[0] | {hash: .digest, bytes: .size}')
+FILE=$(oras manifest fetch "$REG/gp-regions-source@$SOURCE" | jq -c '.layers[0] | {hash: .digest, bytes: .size}')
 
-# 2. a table, with its licence and the file it was read from in its metadata (jq -cS is JCS for values like these)
+# 2. a table, read from the source image by its digest, with its licence and the file it was read from in
+#    its metadata (jq -cS is JCS for values like these)
+oras pull "$REG/gp-regions-source@$SOURCE" --output source
 KEY=$(jq -cnS --argjson licenses "$LICENSES" --argjson file "$FILE" '{licenses: $licenses, sources: [$file]}')
-unzip -oq "$ZIP" gp-reg-pat-prac-quin-age.csv
+unzip -oq "source/$ZIP" gp-reg-pat-prac-quin-age.csv
 duckdb -c "COPY (
     SELECT org_code AS region_code, ONS_CODE AS ons_code, number_of_patients AS patients
     FROM read_csv('gp-reg-pat-prac-quin-age.csv')
@@ -34,7 +39,7 @@ duckdb -c "COPY (
     ORDER BY region_code)
   TO 'regions.parquet' (FORMAT parquet, COMPRESSION zstd, KV_METADATA {datapackage: '$KEY'})"
 
-# 3. the dataset: the tables as layers, naming the source image they were made from as their base,
+# 3. the parquet image: the tables as layers, naming the source image they were made from as their base,
 #    and the commit holding this script when there is one
 jq -n --arg base "$REG/gp-regions-source:2026-09-10" --arg digest "$SOURCE" \
   --arg repo "${REPO_URL:-}" --arg revision "${REVISION:-}" '{"$manifest": ({
@@ -44,7 +49,7 @@ jq -n --arg base "$REG/gp-regions-source:2026-09-10" --arg digest "$SOURCE" \
   "org.opencontainers.image.base.digest": $digest}
   + if $repo == "" then {} else {
   "org.opencontainers.image.source": $repo,
-  "org.opencontainers.image.revision": $revision} end)}' > dataset.annotations.json
-oras push "$REG/gp-regions:2026-09-10" --artifact-type application/vnd.fyi.parq.dataset.v1 \
-  --config empty.json:application/vnd.oci.empty.v1+json --annotation-file dataset.annotations.json \
+  "org.opencontainers.image.revision": $revision} end)}' > parq.annotations.json
+oras push "$REG/gp-regions:2026-09-10" --artifact-type application/vnd.fyi.parq.v1 \
+  --config empty.json:application/vnd.oci.empty.v1+json --annotation-file parq.annotations.json \
   regions.parquet:application/vnd.apache.parquet
